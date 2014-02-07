@@ -9,6 +9,7 @@ import (
 
 	"github.com/bgentry/heroku-go"
 	"github.com/bgentry/speakeasy"
+	"github.com/heroku/hk/hkclient"
 	"github.com/heroku/hk/term"
 )
 
@@ -21,7 +22,24 @@ var cmdCreds = &Command{
 }
 
 func runCreds(cmd *Command, args []string) {
-	fmt.Println(getCreds(apiURL))
+	var err error
+
+	nrc, err = hkclient.LoadNetRc()
+	if err != nil {
+		printError(err.Error())
+	}
+
+	u, err := url.Parse(apiURL)
+	if err != nil {
+		printError("could not parse API url: " + err.Error())
+	}
+
+	user, pass, err := nrc.GetCreds(u)
+	if err != nil {
+		printError("could not get credentials: " + err.Error())
+	}
+
+	fmt.Println(user, pass)
 }
 
 var cmdLogin = &Command{
@@ -71,10 +89,16 @@ func runLogin(cmd *Command, args []string) {
 		}
 	}
 
-	err = saveCreds(hostname, username, token)
+	nrc, err = hkclient.LoadNetRc()
+	if err != nil {
+		printError("loading netrc: " + err.Error())
+	}
+
+	err = nrc.SaveCreds(hostname, username, token)
 	if err != nil {
 		printFatal("saving new token: " + err.Error())
 	}
+
 	fmt.Println("Logged in.")
 }
 
@@ -136,10 +160,17 @@ func runLogout(cmd *Command, args []string) {
 		cmd.printUsage()
 		os.Exit(2)
 	}
+
 	u, err := url.Parse(client.URL)
 	if err != nil {
 		printFatal("couldn't parse client URL: " + err.Error())
 	}
+
+	nrc, err = hkclient.LoadNetRc()
+	if err != nil {
+		printError(err.Error())
+	}
+
 	err = removeCreds(strings.Split(u.Host, ":")[0])
 	if err != nil {
 		printFatal("saving new netrc: " + err.Error())
